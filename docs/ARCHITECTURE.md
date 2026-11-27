@@ -39,7 +39,7 @@ The follower refreshes its communication timer on each new valid coordinator pac
 | Duplicate phase/heartbeat/status sequence | Ignore it |
 | Duplicate command sequence | Re-acknowledge without applying the command again |
 | Unknown coordinator phase | Follower displays red |
-| Follower loses coordinator packets | Follower displays red after timeout |
+| Follower loses coordinator packets | Follower displays red after timeout and resets its receive sequence window for later recovery |
 | Follower command receives no acknowledgement | Retry the same packet up to four total sends, then display red |
 | Coordinator has not heard follower status | Internal `follower_connected` diagnostic becomes false; coordinator still owns timing |
 | Device restart | Both programs initialize their outputs to red; coordinator starts stopped |

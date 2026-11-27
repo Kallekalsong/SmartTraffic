@@ -22,7 +22,7 @@ next_heartbeat_at = [0]
 tx_sequence = [0]
 last_follower_sequence = [-1]
 last_command_sequence = [-1]
-last_follower_status_at = [-1]
+last_follower_packet_at = [-1]
 follower_connected = [False]
 pending_action = [""]
 incoming_packet = [""]
@@ -51,7 +51,10 @@ def valid_phase(name):
 
 def next_sequence():
     tx_sequence[0] = (tx_sequence[0] + 1) % SEQUENCE_MODULUS
-    return ("0000" + str(tx_sequence[0]))[-4:]
+    number = str(tx_sequence[0])
+    while len(number) < 4:
+        number = "0" + number
+    return number
 
 def sequence_is_newer(value, previous):
     if previous < 0:
@@ -96,7 +99,9 @@ def switch_lights_off():
 
 def send_ack(request_number, result):
     number = next_sequence()
-    request_text = ("0000" + str(request_number))[-4:]
+    request_text = str(request_number)
+    while len(request_text) < 4:
+        request_text = "0" + request_text
     radio.send_string(make_packet("A", number, request_text + ":" + result))
 
 def handle_command(packet):
@@ -105,6 +110,8 @@ def handle_command(packet):
 
     # Re-acknowledge a retry of the last accepted command without applying it twice.
     if request_number == last_command_sequence[0]:
+        last_follower_packet_at[0] = control.millis()
+        follower_connected[0] = True
         send_ack(request_number, "OK")
         return
 
@@ -113,6 +120,8 @@ def handle_command(packet):
 
     last_command_sequence[0] = request_number
     last_follower_sequence[0] = request_number
+    last_follower_packet_at[0] = control.millis()
+    follower_connected[0] = True
     if command == "START":
         start_simulation()
         send_ack(request_number, "OK")
@@ -141,7 +150,7 @@ def process_packet(message):
             return
         if sequence_is_newer(number, last_follower_sequence[0]):
             last_follower_sequence[0] = number
-            last_follower_status_at[0] = control.millis()
+            last_follower_packet_at[0] = control.millis()
             follower_connected[0] = True
 
 def on_radio_received(message):
@@ -199,8 +208,11 @@ def main_loop():
         number = next_sequence()
         radio.send_string(make_packet("H", number, phase[0]))
 
-    if last_follower_status_at[0] >= 0:
-        follower_connected[0] = (now - last_follower_status_at[0] <= LINK_TIMEOUT_MS)
+    if follower_connected[0] and now - last_follower_packet_at[0] > LINK_TIMEOUT_MS:
+        follower_connected[0] = False
+        # A quiet peer may have restarted with its sequence counter at zero.
+        last_follower_sequence[0] = -1
+        last_command_sequence[0] = -1
 
     basic.pause(20)
 

@@ -35,7 +35,7 @@ Phase payloads are `G1`, `Y1`, `AR`, `G2`, `Y2`, `STOP` and `OFF`. `AR` represen
 
 ## Sequence and duplicate handling
 
-Each sender increments its own sequence for every new packet and wraps from 9999 to 0000. The receiver accepts only a sequence that is forward within half of the 10,000-value range; this handles normal wraparound and rejects duplicates or older packets. A device restart resets its counter, so packets from before a restart can be rejected until the counter advances sufficiently or the receiver restarts. There is no persistent session identifier.
+Each sender increments its own sequence for every new packet and wraps from 9999 to 0000. The receiver accepts only a sequence that is forward within half of the 10,000-value range; this handles normal wraparound and rejects duplicates or older packets. After a receiver has heard nothing for the 1.8-second timeout, it resets its receive sequence window so a restarted peer can begin again at a low sequence. This permits recovery after silence but cannot distinguish a new session from a delayed packet; there is no persistent session identifier.
 
 The coordinator remembers the most recent follower command. If the same command is retried, it sends another acknowledgement without applying the action a second time. Older commands are ignored. A new start/stop/off action replaces a pending follower request.
 

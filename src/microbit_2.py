@@ -48,7 +48,10 @@ def valid_phase(name):
 
 def next_sequence():
     tx_sequence[0] = (tx_sequence[0] + 1) % SEQUENCE_MODULUS
-    return ("0000" + str(tx_sequence[0]))[-4:]
+    number = str(tx_sequence[0])
+    while len(number) < 4:
+        number = "0" + number
+    return number
 
 def sequence_is_newer(value, previous):
     if previous < 0:
@@ -106,10 +109,14 @@ def process_packet(message):
 
     if kind != "P" and kind != "H" and kind != "A":
         return
+    now = control.millis()
+    if last_coordinator_packet_at[0] >= 0 and now - last_coordinator_packet_at[0] > LINK_TIMEOUT_MS:
+        # A quiet coordinator may have restarted with its sequence counter at zero.
+        last_coordinator_sequence[0] = -1
     if not sequence_is_newer(number, last_coordinator_sequence[0]):
         return
     last_coordinator_sequence[0] = number
-    last_coordinator_packet_at[0] = control.millis()
+    last_coordinator_packet_at[0] = now
     link_ok[0] = True
 
     if kind == "A":
@@ -170,8 +177,9 @@ def main_loop():
             radio.send_string(make_packet("S", number, "OK"))
 
     if last_coordinator_packet_at[0] >= 0:
-        if now - last_coordinator_packet_at[0] > LINK_TIMEOUT_MS:
+        if now - last_coordinator_packet_at[0] > LINK_TIMEOUT_MS and link_ok[0]:
             link_ok[0] = False
+            last_coordinator_sequence[0] = -1
             phase[0] = "STOP"
             show_phase("STOP")
 
