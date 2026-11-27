@@ -1,231 +1,88 @@
 # SmartTraffic
-A distributed traffic-light simulation built with two BBC micro:bits, LED indicators, wireless radio communication and a timed state machine using MakeCode Python
-# SmartTraffic
 
-### A distributed micro:bit traffic-light simulation
+**An educational, two-device traffic-light simulation for BBC micro:bit and Microsoft MakeCode Python.**
 
-SmartTraffic is an experimental distributed traffic-light simulation built using two BBC micro:bit devices, external LED indicators and wireless radio communication.
+SmartTraffic uses two micro:bits, three external LEDs per device and the built-in radio to explore embedded programming, state machines, distributed systems and unreliable communication. One device coordinates timing; the other follows its phase messages. Either device can request start, stop or lights-off.
 
-The project explores distributed state machines, embedded programming, communication protocols, timing systems, event-driven programming and fault-handling concepts using the MakeCode Python environment.
+> **Safety:** This is a classroom experiment, not traffic-control equipment. Radio delivery is not guaranteed; the design is not certified or safety-validated. Never connect it to a real road or use it to direct people or vehicles. See [Safety](docs/SAFETY.md).
 
----
+## Features
 
-## Overview
-
-SmartTraffic consists of two communicating micro:bit units representing two traffic signal directions in a simplified intersection simulation.
-
-The devices communicate wirelessly using the micro:bit radio system. A coordination unit manages the simulated traffic phases while the second unit follows the transmitted phase information.
-
-Both devices have local controls for starting, stopping and switching off the LED simulation.
-
-### Project goals
-
-- Build a distributed embedded system using micro:bit.
-- Implement a traffic-light state machine.
-- Explore wireless communication between micro:bit devices.
-- Use event-driven programming.
-- Implement timed state transitions.
-- Investigate synchronization and communication failures.
-- Create a modular and documented MakeCode Python project.
-- Learn about embedded systems architecture.
-
----
+- Six-phase alternating sequence with non-blocking elapsed-time transitions.
+- P0 red, P1 yellow, P2 green on both devices.
+- Radio group **138**, with validated phase, heartbeat, command, status and acknowledgement messages.
+- Four-digit rolling sequence numbers; duplicate command handling and bounded command retries.
+- Follower red fallback after communication loss; coordinator remains the sole timing authority.
+- A, B and A+B controls on both devices.
 
 ## Hardware
 
-### Required components
+Two BBC micro:bit devices, two red LEDs, two yellow LEDs, two green LEDs, six suitable current-limiting resistors, wires and a common reference (GND). Each micro:bit uses the same pin assignments:
 
-| Component | Quantity |
-|---|---:|
-| BBC micro:bit | 2 |
-| Red LED | 2 |
-| Yellow LED | 2 |
-| Green LED | 2 |
-| Suitable LED resistors | 6 |
-| Connecting wires | As required |
-
-The LEDs should be connected using suitable current-limiting resistors.
-
-### Pin configuration
-
-| Pin | Function |
-|---|---|
-| P0 | Red LED |
-| P1 | Yellow LED |
-| P2 | Green LED |
+| Pin | LED |
+| --- | --- |
+| P0 | Red |
+| P1 | Yellow |
+| P2 | Green |
 | GND | Common ground |
 
-Each micro:bit uses the same pin configuration.
-
----
+Use one resistor in series with each LED. Check polarity and board limits before powering the circuit. See [Wiring](docs/WIRING.md).
 
 ## Architecture
 
-SmartTraffic uses a two-device architecture.
+- **Micro:bit 1 (coordinator):** owns the phase clock, changes phases, drives its LEDs, processes commands and broadcasts the current phase/heartbeat.
+- **Micro:bit 2 (follower):** drives its LEDs from the coordinator's latest valid phase, sends control requests and periodic status messages, and shows red if the coordinator becomes silent.
 
-### Micro:bit 1
+Both devices accept local buttons. The follower sends requests; it never advances the phase clock independently. This avoids two competing timing authorities. See [Architecture](docs/ARCHITECTURE.md).
 
-Micro:bit 1 is responsible for coordinating the simulated traffic phases.
+## Traffic sequence
 
-Responsibilities:
+| Phase | Direction 1 | Direction 2 | Duration |
+| --- | --- | --- | ---: |
+| G1 | Green | Red | 8 s |
+| Y1 | Yellow | Red | 2 s |
+| AR1 | Red | Red | 1 s |
+| G2 | Red | Green | 8 s |
+| Y2 | Red | Yellow | 2 s |
+| AR2 | Red | Red | 1 s |
 
-- Manage the traffic phase state machine.
-- Control its local LEDs.
-- Broadcast phase changes.
-- Process local control inputs.
-- Receive remote commands.
-- Maintain phase timing.
-
-### Micro:bit 2
-
-Micro:bit 2 follows the transmitted phase information.
-
-Responsibilities:
-
-- Receive radio messages.
-- Interpret phase commands.
-- Update local LEDs.
-- Send start and stop requests.
-- Monitor incoming communication.
-
-The devices share a common radio group.
-
----
-
-## Communication
-
-### Radio configuration
-
-- Radio group: 138
-- Communication method: Radio string messages
-- Platform: BBC micro:bit
-- Environment: Microsoft MakeCode Python
-
-### Protocol messages
-
-| Message | Purpose |
-|---|---|
-| CMD_START | Request a system start |
-| CMD_STOP | Request a system stop |
-| CMD_OFF | Request LED shutdown |
-| PHASE_G1 | Direction 1 simulated green phase |
-| PHASE_Y1 | Direction 1 simulated yellow phase |
-| PHASE_G2 | Direction 2 simulated green phase |
-| PHASE_Y2 | Direction 2 simulated yellow phase |
-| PHASE_ALLRED | Simulated all-red phase |
-| PHASE_STOP | Stop signal |
-
-This protocol is a prototype and does not implement a fully reliable delivery or acknowledgement system.
-
----
-
-## Traffic phases
-
-The simulation uses the following conceptual sequence:
-
-1. Direction 1 green.
-2. Direction 1 yellow.
-3. All-red simulation.
-4. Direction 2 green.
-5. Direction 2 yellow.
-6. All-red simulation.
-7. Repeat.
-
-The sequence is controlled using a timed state machine.
-
----
+The two all-red intervals use the shared protocol state `AR`. The sequence repeats until stopped. Durations are experimental defaults, not engineering recommendations. See [State machine](docs/STATE_MACHINE.md).
 
 ## Controls
 
-| Input | Action |
-|---|---|
-| Button A | Request start |
-| Button B | Request stop |
-| Buttons A+B | Switch off LEDs |
+| Input (on either device) | Effect |
+| --- | --- |
+| A | Start or request start; begins at G1 if stopped |
+| B | Stop or request stop; both outputs show red |
+| A+B | Switch off all six external LEDs |
 
-Controls can be activated on either micro:bit.
+Stopping leaves red LEDs on. Switching off extinguishes every external LED; it does not remove power from either micro:bit. A+B is handled as a distinct chord. See [State machine](docs/STATE_MACHINE.md).
 
----
+## Getting Started
 
-## Software
+The repository provides two **MakeCode Python source files**. They are not precompiled `.hex` downloads. MakeCode compiles each program when you click **Download**; the resulting `.hex` file is what gets flashed to a micro:bit. A raw `.py` file is source text, not a ready-to-flash program.
 
-The project uses:
+1. [Download Micro:bit 1 source](https://raw.githubusercontent.com/Kallekalsong/SmartTraffic/codex/smarttraffic-protocol-docs/src/microbit_1.py).
+2. Open [Microsoft MakeCode for micro:bit](https://makecode.microbit.org/) and create a project.
+3. Switch the editor to **Python**, then paste the downloaded source into the editor. These files use MakeCode Python; they are not standard MicroPython files or MakeCode `.hex` project imports.
+4. Click **Download** and let MakeCode compile the project to a `.hex` file.
+5. Connect the first micro:bit over USB and flash that `.hex` file using the [official transfer instructions](https://makecode.microbit.org/device/usb).
+6. Repeat steps 2–5 with [Micro:bit 2 source](https://raw.githubusercontent.com/Kallekalsong/SmartTraffic/codex/smarttraffic-protocol-docs/src/microbit_2.py) and the second micro:bit. Build the LED circuit using [Wiring](docs/WIRING.md), power both devices, then press A on either one. Use B to stop or A+B to switch the LEDs off.
 
-- Microsoft MakeCode
-- MakeCode Python
-- BBC micro:bit radio
-- Digital pin control
-- Event handlers
-- Timer-based state transitions
+MakeCode also supports direct browser transfer on compatible browsers; see its [USB transfer guide](https://makecode.microbit.org/device/usb). For editing and validation details, see [Development](docs/DEVELOPMENT.md).
 
----
+## Repository layout
 
-## Installation
+- `src/microbit_1.py` — coordinator firmware.
+- `src/microbit_2.py` — follower firmware.
+- `docs/ARCHITECTURE.md` — roles and data flow.
+- `docs/RADIO_PROTOCOL.md` — packet format and recovery behavior.
+- `docs/STATE_MACHINE.md` — phases, timings and transitions.
+- `docs/WIRING.md` — component and pin guidance.
+- `docs/SAFETY.md` — limitations and safe use.
+- `docs/DEVELOPMENT.md` — workflow for contributors.
+- `CHANGELOG.md`, `CONTRIBUTING.md` — project history and contribution process.
 
-1. Open Microsoft MakeCode for micro:bit.
-2. Create a new project.
-3. Open the Python editor.
-4. Copy the Micro:bit 1 source code.
-5. Flash it to the first micro:bit.
-6. Create a second project.
-7. Copy the Micro:bit 2 source code.
-8. Flash it to the second micro:bit.
-9. Connect the LED circuits using the documented pin configuration.
-10. Test the simulation in a controlled environment.
+## Status and license
 
----
-
-## Limitations
-
-This project is an educational prototype.
-
-It does not include:
-
-- Certified traffic signal hardware.
-- Guaranteed radio delivery.
-- Verified fail-safe control.
-- Redundant communication.
-- Formal safety verification.
-- Real-world traffic control functionality.
-
-The simulation is not designed or approved for controlling real traffic, roads, vehicles or pedestrians.
-
----
-
-## Future development
-
-Potential improvements:
-
-- Message acknowledgements.
-- Sequence numbers.
-- Heartbeat protocol.
-- State recovery.
-- Radio diagnostics.
-- Fault simulation.
-- Event logging.
-- Configurable phase durations.
-- Better synchronization.
-- Modular protocol design.
-- Automated testing.
-- More traffic signal units.
-- Central monitoring interface.
-
----
-
-## Project status
-
-Experimental prototype.
-
-Version: 1.0.0
-
-Platform: BBC micro:bit
-
-Language: MakeCode Python
-
----
-
-## License
-
-This project is intended for educational experimentation and learning.
-
-See LICENSE for license information.
+Version **0.1.0** is an initial development release; this is not a claim of a tested or production-ready system. No license file is present. The project remains unlicensed until its owner chooses a license; see [Contributing](CONTRIBUTING.md) before reusing or redistributing it.
